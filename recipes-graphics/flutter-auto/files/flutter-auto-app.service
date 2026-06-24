@@ -1,0 +1,17 @@
+[Unit]
+Description=Flutter Auto IVI Application
+After=weston.service
+Requires=weston.service
+
+[Service]
+User=weston
+Group=weston
+WorkingDirectory=/home/weston
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/bin/dbus-run-session -- /usr/bin/flutter-auto -b /usr/share/flutter/yaqoud-flutter-ivi/3.38.3/release/
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target

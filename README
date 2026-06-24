@@ -1,0 +1,19 @@
+meta-yaqoud-ivi is a Yocto layer for the Yaqoud IVI image and related package recipes.
+
+Dependencies
+============
+
+This layer depends on:
+
+  core
+  flutter-layer
+  virtualization-layer
+
+It is compatible with the scarthgap release series.
+
+Adding the layer
+=================
+
+Add the layer to your build with:
+
+  bitbake-layers add-layer meta-yaqoud-ivi

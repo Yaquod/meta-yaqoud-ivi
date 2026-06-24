@@ -1,0 +1,15 @@
+[Unit]
+Description=Load pre-pulled Autoware Docker image
+Before=autoware-agent.service
+After=docker.service
+Requires=docker.service
+ConditionPathExists=/opt/docker-preload/autoware-agent-runtime.tar
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker load -i /opt/docker-preload/autoware-agent-runtime.tar
+ExecStartPost=/bin/rm -f /opt/docker-preload/autoware-agent-runtime.tar
+
+[Install]
+WantedBy=multi-user.target
