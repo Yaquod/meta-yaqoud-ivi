@@ -1,0 +1,18 @@
+[Unit]
+Description=Generate Weston VNC TLS certificates
+ConditionPathExists=!/etc/vnc/keys/tls.crt
+Before=weston.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout /etc/vnc/keys/tls.key \
+    -out /etc/vnc/keys/tls.crt \
+    -days 3650 -subj "/CN=raspberrypi4" && \
+    chown weston:weston /etc/vnc/keys/tls.*  && \
+    chmod 600 /etc/vnc/keys/tls.key && \
+    chmod 644 /etc/vnc/keys/tls.crt'
+
+[Install]
+WantedBy=multi-user.target

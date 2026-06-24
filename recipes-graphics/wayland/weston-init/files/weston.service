@@ -1,0 +1,34 @@
+[Unit]
+Description=Weston, a Wayland compositor, as a system service
+Documentation=man:weston(1) man:weston.ini(5)
+Documentation=http://wayland.freedesktop.org/
+Requires=systemd-user-sessions.service
+After=systemd-user-sessions.service
+After=plymouth-quit-wait.service
+After=weston-tls-setup.service
+Wants=dbus.socket
+After=dbus.socket
+Requires=weston.socket
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+
+[Service]
+Type=notify
+EnvironmentFile=-/etc/default/weston
+ExecStart=/usr/bin/weston --modules=systemd-notify.so,screen-share.so
+User=weston
+Group=weston
+WorkingDirectory=/home/weston
+PAMName=weston-autologin
+TTYPath=/dev/tty7
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty7
+UtmpMode=user
+
+[Install]
+WantedBy=graphical.target
