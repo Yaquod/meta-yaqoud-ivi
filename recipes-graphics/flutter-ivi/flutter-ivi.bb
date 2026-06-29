@@ -8,10 +8,9 @@ SECTION = "graphics"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/Apache-2.0;md5=89aea4e17d99a7cacdbeed46a0096b10"
 
-SRCREV = "7e0bb4faa4d5f92fc0cf0d64ffd1869347c575a9"
+SRCREV = "2223afe848b70661cb20d616d3ab0654ae3be349"
 SRC_URI = "git://github.com/Yaquod/flutter-ivi.git;lfs=0;branch=main;protocol=https"
 
-S = "${WORKDIR}/git"
 
 PUBSPEC_APPNAME = "flutter_ivi"
 FLUTTER_APPLICATION_INSTALL_SUFFIX = "yaqoud-flutter-ivi"

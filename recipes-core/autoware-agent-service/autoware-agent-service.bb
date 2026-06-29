@@ -4,16 +4,15 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 SRC_URI = "file://autoware-agent.service"
 
-S = "${WORKDIR}"
+S = "${UNPACKDIR}"
 
 inherit systemd allarch
 
 do_install() {
     install -d ${D}${systemd_unitdir}/system
-    install -m 0644 ${WORKDIR}/autoware-agent.service ${D}${systemd_unitdir}/system/autoware-agent.service
+    install -m 0644 ${UNPACKDIR}/autoware-agent.service ${D}${systemd_unitdir}/system/autoware-agent.service
 }
 
 FILES:${PN} = "${systemd_unitdir}/system/autoware-agent.service"
-
 SYSTEMD_SERVICE:${PN} = "autoware-agent.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
