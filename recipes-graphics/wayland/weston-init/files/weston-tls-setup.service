@@ -9,7 +9,7 @@ RemainAfterExit=yes
 ExecStart=/bin/sh -c 'openssl req -x509 -nodes -newkey rsa:2048 \
     -keyout /etc/vnc/keys/tls.key \
     -out /etc/vnc/keys/tls.crt \
-    -days 3650 -subj "/CN=raspberrypi4" && \
+    -days 3650 -subj "/CN=yaqoud-orin-nano" && \
     chown weston:weston /etc/vnc/keys/tls.*  && \
     chmod 600 /etc/vnc/keys/tls.key && \
     chmod 644 /etc/vnc/keys/tls.crt'

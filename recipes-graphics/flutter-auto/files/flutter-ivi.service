@@ -1,0 +1,20 @@
+[Unit]
+Description=Flutter IVI App
+After=agl-compositor.service flutter-cluster.service
+Requires=agl-compositor.service
+
+[Service]
+User=agl-driver
+Group=agl-driver
+WorkingDirectory=/home/agl-driver
+Environment=XDG_RUNTIME_DIR=/run/user/1001
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/bin/dbus-run-session -- /usr/bin/flutter-auto \
+    --window-type=normal \
+    --width=1520 --height=1080 \
+    -b /usr/share/flutter/yaqoud-flutter-ivi/3.38.3/release/
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target

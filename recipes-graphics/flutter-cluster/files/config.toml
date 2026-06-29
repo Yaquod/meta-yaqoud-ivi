@@ -1,0 +1,12 @@
+[global]
+app_id = 'cluster'
+
+[view]
+width = 1024
+height = 150
+
+[window_activation_area]
+x = 0
+y = 0
+width = 1024
+height = 150

@@ -1,15 +1,14 @@
 [Unit]
-Description=Load pre-pulled Autoware Docker image
+Description=Pull Autoware agent Docker image from GHCR
 Before=autoware-agent.service
-After=docker.service
+After=docker.service network-online.target
 Requires=docker.service
-ConditionPathExists=/opt/docker-preload/autoware-agent-runtime.tar
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/docker load -i /opt/docker-preload/autoware-agent-runtime.tar
-ExecStartPost=/bin/rm -f /opt/docker-preload/autoware-agent-runtime.tar
+ExecStart=/usr/bin/docker pull ghcr.io/yaquod/autoware-agent-runtime:latest
 
 [Install]
 WantedBy=multi-user.target
