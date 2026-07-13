@@ -1,1 +1,6 @@
 .vscode
+# Real secret-bearing .env for flutter-ivi (API keys, VIN, etc). Never commit --
+# recipes-graphics/flutter-ivi/flutter-ivi.bb bakes it into the app bundle at
+# build time if present, falling back to the committed placeholder env.sample.
+recipes-graphics/flutter-ivi/files/env.real
+recipes-connectivity/iv-cloud-gateway/files/gateway.env.real

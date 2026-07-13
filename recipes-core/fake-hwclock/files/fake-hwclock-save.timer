@@ -1,0 +1,9 @@
+[Unit]
+Description=Periodically save the system clock for fake-hwclock
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target
