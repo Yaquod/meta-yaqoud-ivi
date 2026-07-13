@@ -10,10 +10,22 @@ Group=agl-driver
 WorkingDirectory=/home/agl-driver
 Environment=XDG_RUNTIME_DIR=/run/user/1001
 Environment=WAYLAND_DISPLAY=wayland-0
+# CEF/FFI webview backend (chromium_dart_view plugin dlopen()s this by soname
+# on the default lib path too; pinned explicitly here per upstream flutter-ivi
+# guidance -- see recipes-graphics/flutter-ivi/flutter-ivi.bb).
+Environment=CHROMIUM_DART_LIB=/usr/lib/libchromium_nc.so
+# libchromium_nc.so bakes a build-host sysroot path as its CEF_ROOT fallback
+# (see recipes-graphics/chromium-dart/libchromium-nc_git.bb) -- it reads this
+# env var first, so this is required, not optional, for CEF to find
+# Resources/Release on the actual device.
+Environment=CEF_ROOT=/usr/share/cef
+Environment=VIDEO_PLAYER_AUDIO_SINK=autoaudiosink
+EnvironmentFile=-/etc/default/flutter-ivi
 ExecStart=/usr/bin/dbus-run-session -- /usr/bin/flutter-auto \
     -b /usr/share/flutter/yaqoud-flutter-ivi/3.38.3/release/ \
     --width=1024 --height=600 \
-    --window-type=BG
+    --window-type=BG \
+    --output-index=0
 Restart=on-failure
 RestartSec=3
 

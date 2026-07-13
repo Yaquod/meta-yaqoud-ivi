@@ -1,0 +1,27 @@
+#!/bin/sh
+# Minimal fake-hwclock: persists the system clock across reboots on boards
+# without a reliable battery-backed RTC, by saving/restoring a timestamp file.
+# Never moves the clock backwards -- only forward, and only if the current
+# (RTC-derived) time looks older than the last saved value.
+
+DATAFILE=/etc/fake-hwclock.data
+
+save() {
+    date -u '+%s' > "$DATAFILE"
+}
+
+restore() {
+    [ -s "$DATAFILE" ] || exit 0
+    saved_epoch=$(cat "$DATAFILE")
+    case "$saved_epoch" in ''|*[!0-9]*) exit 0 ;; esac
+    now_epoch=$(date -u '+%s')
+    if [ "$saved_epoch" -gt "$now_epoch" ]; then
+        date -u -s "@$saved_epoch" >/dev/null
+    fi
+}
+
+case "$1" in
+    save) save ;;
+    restore|load) restore ;;
+    *) echo "Usage: $0 {save|restore}" >&2; exit 1 ;;
+esac

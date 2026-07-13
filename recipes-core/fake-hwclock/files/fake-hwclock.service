@@ -1,0 +1,15 @@
+[Unit]
+Description=Restore / save the current system clock
+DefaultDependencies=no
+Before=sysinit.target time-sync.target
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/fake-hwclock restore
+ExecStop=/usr/sbin/fake-hwclock save
+
+[Install]
+WantedBy=sysinit.target

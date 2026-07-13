@@ -1,0 +1,22 @@
+[Unit]
+Description=Vehicle Cloud Gateway (iv-cloud-gateway)
+Documentation=https://github.com/Yaquod/iv-cloud-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# gateway::Config::from_env() reads GATEWAY_ENV_FILE (default ".env" in the
+# CWD) at startup; real environment variables always win over the file.
+Environment=GATEWAY_ENV_FILE=/etc/vehicle-gateway/.env
+EnvironmentFile=-/etc/default/iv-cloud-gateway
+ExecStart=/usr/bin/vehicle_gateway
+Restart=on-failure
+RestartSec=5
+
+User=iv-gateway
+Group=iv-gateway
+LogsDirectory=vehicle-gateway
+
+[Install]
+WantedBy=multi-user.target

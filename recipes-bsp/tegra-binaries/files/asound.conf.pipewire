@@ -1,0 +1,7 @@
+pcm.!default {
+    type pipewire
+    hint.description "PipeWire Sound Server"
+}
+ctl.!default {
+    type pipewire
+}

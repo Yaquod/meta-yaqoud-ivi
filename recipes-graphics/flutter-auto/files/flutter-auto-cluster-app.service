@@ -11,7 +11,10 @@ WorkingDirectory=/home/agl-driver
 Environment=XDG_RUNTIME_DIR=/run/user/1001
 Environment=WAYLAND_DISPLAY=wayland-0
 ExecStart=/usr/bin/dbus-run-session -- /usr/bin/flutter-auto \
-    -b /usr/share/flutter/yaqoud-flutter-cluster/3.38.3/release/
+    -b /usr/share/flutter/yaqoud-flutter-cluster/3.38.3/release/ \
+    --width=400 --height=1080 \
+    --window-type=BG \
+    --output-index=1
 Restart=on-failure
 RestartSec=3
 
