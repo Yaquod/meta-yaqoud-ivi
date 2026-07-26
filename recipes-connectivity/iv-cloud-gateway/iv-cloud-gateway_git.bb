@@ -23,12 +23,46 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/Apache-2.0;md5=89aea4e17d99a7ca
 # file" for third_party/{json,spdlog,yaml-cpp,googletest}. gitsm:// is the
 # fetcher that's actually worked for submodules elsewhere in this layer
 # (flutter-auto's shell/plugins, cef, libchromium-nc).
+#
+# 0001-stream-heartbeat-broadcast-pickup-arrived.patch: local patch, not yet
+# merged upstream (github.com/Yaquod/iv-cloud-gateway, see branch
+# fix/stream-heartbeat-and-broadcast) -- fixes three real, confirmed-on-device
+# VehicleCommandStream bugs: (1) the stream flapped "Autoware connected"/
+# "disconnected" every ~10s because the gateway never wrote anything back
+# while idling with no trip to dispatch, and the autoware-agent client
+# cancels if it gets zero response within 8s of connecting -- fixed with an
+# immediate Heartbeat GatewayCommand on connect; (2) VehicleStreamHandler
+# only ever tracked a single "active_" connection, so of the two independent
+# clients that connect to this same stream (autoware_agent and flutter-ivi)
+# whichever connected most recently silently starved the other of every
+# command -- fixed by broadcasting to the full set of connected clients;
+# (3) nothing in the wire protocol distinguished "arrived at pickup" from
+# "arrived at destination", so flutter-ivi had no way to show its Start Trip
+# button at the right moment -- fixed by forwarding autoware_agent's
+# TripInitAck (sent exactly on that transition) as a new PickupArrived
+# GatewayCommand. Drop this once the fix lands upstream and SRCREV is
+# bumped past it.
+#
+# 0002-fix-credentials-dir-on-device-path.patch: local patch, not yet merged
+# upstream -- CREDENTIALS_DIR was compiled in as ${CMAKE_SOURCE_DIR}/credentials
+# (an absolute build-host path that doesn't exist on the target at all), so
+# vehicle auth credentials could never actually be saved/loaded on-device --
+# confirmed on-device via journalctl: admin login succeeds, create_vehicle()
+# gets a 409 (already registered from some earlier build), then
+# load_vehicle_credentials() fails with "no credentials file found" and the
+# vehicle never authenticates. Points it at /etc/vehicle-gateway/credentials
+# instead (created + chowned in do_install/pkg_postinst below, same pattern
+# as the existing .env). See the patch file's own header for what this does
+# and doesn't fix (this VIN's already-issued apiKey/apiSecret from before this
+# fix are not recoverable from the device side).
 SRC_URI = " \
     gitsm://github.com/Yaquod/iv-cloud-gateway.git;protocol=https;branch=main \
     file://iv-cloud-gateway.service \
     file://gateway.env.sample \
     file://gateway.env.real \
     file://grpc_cpp_plugin_target.cmake \
+    file://0001-stream-heartbeat-broadcast-pickup-arrived.patch \
+    file://0002-fix-credentials-dir-on-device-path.patch \
 "
 SRCREV = "29b07f428768d2d446546e03ea7528ac53f1acd5"
 
@@ -91,6 +125,12 @@ do_install:append() {
         bbwarn "iv-cloud-gateway: using gateway.env.sample placeholders for the deployed .env -- add recipes-connectivity/iv-cloud-gateway/files/gateway.env.real with real target values"
     fi
 
+    # CREDENTIALS_DIR (see 0002-fix-credentials-dir-on-device-path.patch) --
+    # the binary writes vehicle_credentials.json here at runtime; needs to
+    # exist and be writable by the iv-gateway user (chowned in pkg_postinst
+    # below) before that first write happens.
+    install -d ${D}${sysconfdir}/vehicle-gateway/credentials
+
     # vehicle_gateway dynamically links libproto_lib.so (the generated
     # protobuf/grpc code, built as its own internal shared lib by
     # proto/CMakeLists.txt) with no RPATH override, so it resolves via the
@@ -107,9 +147,11 @@ do_install:append() {
 # which conflicts with Yocto's own stripping pass. Functionally harmless,
 # just means no -dbg symbols are available for this binary.
 #
-# buildpaths: the KNOWN UPSTREAM ISSUE documented at the bottom of this file
-# (CREDENTIALS_DIR baked in from CMAKE_SOURCE_DIR) -- confirmed nothing a
-# Yocto recipe can fix without an upstream source change.
+# buildpaths: CREDENTIALS_DIR no longer embeds a build-host path (see
+# 0002-fix-credentials-dir-on-device-path.patch), but PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
+# (src/services/CMakeLists.txt, just below CREDENTIALS_DIR) still does and is
+# unpatched -- left alone since nothing on-device reads it (grep turned up no
+# use of PROJECT_ROOT outside that one compile definition).
 INSANE_SKIP:${PN} += "already-stripped buildpaths"
 
 # The default -dev FILES pulls in any unversioned ${libdir}/lib*.so via
@@ -141,16 +183,20 @@ USERADD_PARAM:${PN} = "--system --no-create-home --shell /sbin/nologin iv-gatewa
 # recipe's own USERADD_PARAM creates, once it exists.
 pkg_postinst:${PN}() {
     chown iv-gateway:iv-gateway $D${sysconfdir}/vehicle-gateway/.env
+    chown iv-gateway:iv-gateway $D${sysconfdir}/vehicle-gateway/credentials
 }
 
 # zenoh-c's cargo-built libzenohc.so isn't always picked up correctly by the
 # shlibs scanner; depend on it explicitly at runtime too, on top of DEPENDS.
 RDEPENDS:${PN} += "zenoh-c"
 
-# KNOWN UPSTREAM ISSUE (not a packaging problem, nothing to fix here): auth
-# credential loading in src/services/auth_services.cc is compiled against
-# CREDENTIALS_DIR="${CMAKE_SOURCE_DIR}/credentials" -- an absolute build-host
-# source path baked in at compile time, and that directory doesn't even exist
-# in the upstream repo. This will not resolve on the installed target and is
-# not something a Yocto recipe can fix; needs an upstream code change (e.g. an
-# installed/configurable credentials path) before auth actually works on-device.
+# KNOWN UPSTREAM ISSUE, fixed locally: CREDENTIALS_DIR was compiled in as a
+# build-host source path -- see 0002-fix-credentials-dir-on-device-path.patch
+# above, and do_install/pkg_postinst for the /etc/vehicle-gateway/credentials
+# directory it now points at. That fix is forward-only: this VIN's
+# already-issued apiKey/apiSecret (from whichever earlier build first
+# registered it, before this fix existed) were never captured anywhere
+# retrievable, and the backend still has this VIN registered (create_vehicle()
+# gets 409, not 201) -- so this device stays unauthenticated as a vehicle
+# until either those original credentials turn up, or the backend
+# resets/deletes this VIN's registration so it can re-register fresh.

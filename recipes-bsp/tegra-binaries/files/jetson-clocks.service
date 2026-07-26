@@ -1,0 +1,12 @@
+[Unit]
+Description=Lock Jetson clocks to their maximum (nvpmodel MAXN_SUPER floor alone was leaving trajectory planning unable to meet its 1s real-time deadline under full Autoware Universe load, causing repeated MRM emergency-stops mid-drive -- confirmed on-device)
+After=nvpmodel.service
+Requires=nvpmodel.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/jetson_clocks
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

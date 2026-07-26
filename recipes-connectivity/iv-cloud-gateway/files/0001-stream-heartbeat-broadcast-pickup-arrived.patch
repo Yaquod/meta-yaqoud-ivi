@@ -1,0 +1,173 @@
+Stream fixes: heartbeat on connect, multi-client broadcast, pickup-arrived event
+
+- Heartbeat GatewayCommand sent immediately on connect so the stream idles
+  correctly instead of flapping every ~10s when there's no trip to dispatch
+  yet (the client cancels if nothing at all arrives within its 8s startup
+  watchdog).
+- VehicleStreamHandler tracked a single 'active_' connection -- whichever
+  client (autoware_agent or flutter-ivi, which both connect to this same
+  VehicleCommandStream independently) connected most recently silently
+  starved the other of every GatewayCommand. Track the full set of
+  connected clients and broadcast to all of them instead.
+- Forward autoware_agent's TripInitAck (sent exactly when its own trip
+  state machine reaches DRIVING_TO_PICKUP -> WAITING_FOR_MOVE, i.e.
+  actually arrived at pickup) as a new PickupArrived GatewayCommand so
+  flutter-ivi can show the Start Trip button at the right moment.
+
+Upstream-Status: Pending [not yet merged on github.com/Yaquod/iv-cloud-gateway]
+
+diff --git a/proto/vehicle_gateway.proto b/proto/vehicle_gateway.proto
+index d16aa1f..a599413 100644
+--- a/proto/vehicle_gateway.proto
++++ b/proto/vehicle_gateway.proto
+@@ -153,6 +153,12 @@ message TripCancelResponse{
+   string message = 2;
+ }
+ 
++message Heartbeat {
++}
++
++message PickupArrived {
++}
++
+ message GatewayCommand {
+   oneof command {
+     TripInitRequest trip_init = 1;
+@@ -161,7 +167,8 @@ message GatewayCommand {
+     OrderUpdateLocationRequest order_update_location = 4;
+     OrderUpdateStatusRequest order_update_status = 5;
+     TripCancelRequest trip_cancel = 6;
+-    
++    Heartbeat heartbeat = 7;
++    PickupArrived pickup_arrived = 8;
+   }
+ }
+ 
+diff --git a/src/services/vehicle_stream_handler.cc b/src/services/vehicle_stream_handler.cc
+index aa56129..f6bf0fa 100644
+--- a/src/services/vehicle_stream_handler.cc
++++ b/src/services/vehicle_stream_handler.cc
+@@ -18,7 +18,8 @@
+ 
+ namespace gateway::services {
+ 
+-std::atomic<VehicleStreamHandler*> VehicleStreamHandler::active_{nullptr};
++std::mutex VehicleStreamHandler::clients_mu_;
++std::set<VehicleStreamHandler*> VehicleStreamHandler::clients_;
+ std::queue<vehicle_gateway::GatewayCommand>
+     VehicleStreamHandler::pending_commands_;
+ std::mutex VehicleStreamHandler::pending_mu_;
+diff --git a/src/services/vehicle_stream_handler.h b/src/services/vehicle_stream_handler.h
+index 71782f5..5266ce5 100644
+--- a/src/services/vehicle_stream_handler.h
++++ b/src/services/vehicle_stream_handler.h
+@@ -23,6 +23,7 @@
+ #include <mutex>
+ #include <nlohmann/json.hpp>
+ #include <queue>
++#include <set>
+ 
+ #include "infra/constants.h"
+ #include "services/stream_tag.h"
+@@ -70,21 +71,40 @@ class VehicleStreamHandler : public IStreamTag {
+           delete this;
+           return;
+         }
+-        spdlog::info("[Stream] Autoware connected — active_ set");
++        spdlog::info("[Stream] client connected");
+         new VehicleStreamHandler(svc_, cq_,
+                                  publish_);  // sibling for next connection
+-        active_.store(this);
++        // Both autoware_agent (the vehicle bridge) and flutter-ivi (the
++        // driver-facing app) connect to this same stream independently and
++        // are both meant to observe every GatewayCommand. Track the full set
++        // of connected clients rather than a single "active" one -- a single
++        // pointer meant only one client (whichever connected last) ever
++        // received anything, silently starving the other.
++        {
++          std::lock_guard<std::mutex> lk(clients_mu_);
++          clients_.insert(this);
++        }
+         flush_pending(this);
++        // The client watchdogs the first 8s of a new connection and cancels
++        // if nothing at all comes back -- normal idle operation (no trip to
++        // dispatch yet) would otherwise flap the stream forever. A heartbeat
++        // right on connect satisfies that check while we wait for a real
++        // GatewayCommand.
++        {
++          vehicle_gateway::GatewayCommand hb;
++          hb.mutable_heartbeat();
++          enqueue(hb);
++        }
+         state_ = State::READING;
+         stream_.Read(&incoming_, this);
+         break;
+ 
+       case State::READING:
+         if (!ok) {
+-          spdlog::warn("[Stream] Autoware disconnected");
++          spdlog::warn("[Stream] client disconnected");
+           {
+-            VehicleStreamHandler* exp = this;
+-            active_.compare_exchange_strong(exp, nullptr);
++            std::lock_guard<std::mutex> lk(clients_mu_);
++            clients_.erase(this);
+           }
+           state_ = State::FINISH;
+           stream_.Finish(grpc::Status::OK, this);
+@@ -95,8 +115,8 @@ class VehicleStreamHandler : public IStreamTag {
+         break;
+ 
+       case State::FINISH: {
+-        VehicleStreamHandler* exp = this;
+-        active_.compare_exchange_strong(exp, nullptr);
++        std::lock_guard<std::mutex> lk(clients_mu_);
++        clients_.erase(this);
+       }
+         delete this;
+         break;
+@@ -122,17 +142,20 @@ class VehicleStreamHandler : public IStreamTag {
+   }
+ 
+   static void push_command(const vehicle_gateway::GatewayCommand& cmd) {
+-    auto* h = active_.load();
+-    if (!h) {
+-      spdlog::warn("[Stream] No Autoware connected — queuing command");
+-      std::lock_guard<std::mutex> lk(pending_mu_);
++    std::lock_guard<std::mutex> lk(clients_mu_);
++    if (clients_.empty()) {
++      spdlog::warn("[Stream] No clients connected — queuing command");
++      std::lock_guard<std::mutex> lk2(pending_mu_);
+       pending_commands_.push(cmd);
+       return;
+     }
+-    h->enqueue(cmd);
++    for (auto* h : clients_) {
++      h->enqueue(cmd);
++    }
+   }
+ 
+-  static std::atomic<VehicleStreamHandler*> active_;
++  static std::mutex clients_mu_;
++  static std::set<VehicleStreamHandler*> clients_;
+   static std::queue<vehicle_gateway::GatewayCommand> pending_commands_;
+   static std::mutex pending_mu_;
+ 
+@@ -161,6 +184,17 @@ class VehicleStreamHandler : public IStreamTag {
+     if (ev.has_trip_init_ack()) {
+       spdlog::info("[Stream] TripInitAck success={}",
+                    ev.trip_init_ack().success());
++      // autoware_agent sends this ack exactly when its own trip state
++      // machine transitions DRIVING_TO_PICKUP -> WAITING_FOR_MOVE -- i.e.
++      // the vehicle has arrived at pickup and is waiting for the actual
++      // trip-start command. Broadcast that as its own event so flutter-ivi
++      // (which never sends TripInitAck itself) can show the Start Trip
++      // button at exactly the right moment.
++      if (ev.trip_init_ack().success()) {
++        vehicle_gateway::GatewayCommand cmd;
++        cmd.mutable_pickup_arrived();
++        VehicleStreamHandler::push_command(cmd);
++      }
+     } else if (ev.has_trip_park_ack()) {
+       spdlog::info("[Stream] TripParkAck success={}",
+                    ev.trip_park_ack().success());
