@@ -10,8 +10,26 @@ SECTION = "graphics"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/Apache-2.0;md5=89aea4e17d99a7cacdbeed46a0096b10"
 
-SRCREV = "352492c10f03ba353c3b25801c0211f7fba044b8"
-SRC_URI = "git://github.com/Yaquod/flutter-ivi.git;lfs=0;branch=main;protocol=https \
+# fix/initial-map-center: not yet merged to main. Point back at
+# branch=main;SRCREV=352492c... once the PR lands. Includes:
+#   - initial map center (CEF Google Maps webview + home-screen static map
+#     preview) from INITIAL_LAT/INITIAL_LON instead of a hardcoded Cairo default
+#   - TripManager lifted to an app-wide provider (main.dart) instead of being
+#     scoped to NavigationScreen, so trip dispatch/telemetry keep flowing and
+#     the home screen's MapCard reflects live state regardless of which screen
+#     is showing
+#   - regenerated vehicle_gateway proto bindings (previously missing
+#     trip_park/order_update_location/order_update_status/trip_cancel/
+#     heartbeat/pickup_arrived entirely) and a new arrived-at-pickup screen
+#     with a real Start Trip button (POSTs to
+#     {BASE_URL}/api/trips/request/{id}/start)
+#   - map_card.dart's navigation/arrival panels were fully hardcoded demo data;
+#     wiring them to live TripManager state caused Chromium/CEF errors and
+#     app freezes on-device, so that specific change (only that one) was
+#     reverted back to static placeholder content -- everything else above
+#     stands.
+SRCREV = "ca7d7c426ad4651d358332b0ca2af71cf4021f97"
+SRC_URI = "git://github.com/Yaquod/flutter-ivi.git;lfs=0;branch=fix/initial-map-center;protocol=https \
            file://env.sample \
            file://env.real \
            "

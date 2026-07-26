@@ -28,6 +28,13 @@ ExecStart=/usr/bin/dbus-run-session -- /usr/bin/flutter-auto \
     --output-index=0
 Restart=on-failure
 RestartSec=3
+# Confirmed on-device: this process's Chromium/CEF webview can balloon to
+# ~4GB RSS under active use, and with no swap configured that alone was
+# enough to trigger a kernel OOM kill. Positive OOMScoreAdjust makes this the
+# preferred OOM victim over the Autoware/agent containers (oom_score_adj=-900
+# there) -- losing the IVI app is a UX problem; losing a driving-critical
+# container mid-drive is a safety problem.
+OOMScoreAdjust=800
 
 [Install]
 WantedBy=graphical.target

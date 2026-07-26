@@ -13,6 +13,11 @@ EnvironmentFile=-/etc/default/iv-cloud-gateway
 ExecStart=/usr/bin/vehicle_gateway
 Restart=on-failure
 RestartSec=5
+# Relays commands between the cloud backend and the vehicle (Autoware/agent);
+# lightweight process, unlikely to be a large memory consumer itself, but
+# part of the same safety-relevant chain as the Autoware containers
+# (oom_score_adj=-900 there) -- keep it out of OOM-victim contention too.
+OOMScoreAdjust=-500
 
 User=iv-gateway
 Group=iv-gateway

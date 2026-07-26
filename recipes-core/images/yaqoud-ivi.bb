@@ -76,7 +76,13 @@ IMAGE_INSTALL:append = " \
 # map data bind-mounted into it. rootfs-expand: first-boot partition/fs grow
 # so /var/lib/docker has room for the (large) Autoware images -- needs
 # parted (partition resize; growpart isn't packaged in any layer in this
-# build), e2fsprogs-resize2fs, util-linux (lsblk/findmnt).
+# build), e2fsprogs-resize2fs, util-linux (lsblk/findmnt). jetson-clocks-boot:
+# locks clocks to nvpmodel's MAXN_SUPER maximum at every boot (see
+# recipes-bsp/tegra-binaries/jetson-clocks-boot.bb and the
+# tegra-nvpmodel-base_%.bbappend next to it) -- confirmed on-device that
+# without this, Autoware Universe's trajectory planner intermittently misses
+# its 1s real-time deadline during an actual drive and the vehicle hits a
+# real MRM emergency-stop mid-route.
 IMAGE_INSTALL:append = " \
     curl \
     git \
@@ -87,6 +93,7 @@ IMAGE_INSTALL:append = " \
     rootfs-expand \
     autoware-agent-stack \
     awsim-shinjuku-map \
+    jetson-clocks-boot \
 "
 
 # autoware-edge-image's own user; docker group membership so the compose
